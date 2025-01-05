@@ -180,13 +180,35 @@ country_bounding_boxes = {
     'ZW': ('Zimbabwe', (25.2642257016, -22.2716118303, 32.8498608742, -15.5077869605)),
 }
 
-countries = {v[0]: v[1] for _, v in country_bounding_boxes.items()}
+COUNTRIES = {v[0]: v[1] for _, v in country_bounding_boxes.items()}
 
+# must return N, W, S, E for cds_request
+# with W < E and S < N
 def get_country_bounding_box(country: str) -> tuple[int, int, int, int]:
-    '''Get W, S, E, N integer boundary coordinates of a country'''
-    return [expand(i, coord) for i, coord in enumerate(countries[country])]
+    '''
+    Returns N, W, S E boundary box coordinates for country.
+    
+    Recieves W, S, E, N integer boundary coordinates of country,
+    slightly expands boundary box by rounding coordinates to integer values.
+    '''
+    wsen = [__expand(i, coord) for i, coord in enumerate(COUNTRIES[country])]
+    if wsen[0] > wsen[2]: # W > E
+        raise ValueError(f'Invalid country boundary box for {country}: W > E')
+    if wsen[1] > wsen[3]: # S > N
+        raise ValueError(f'Invalid country boundary box for {country}: S > N')
+    return (wsen[3], wsen[0], wsen[1], wsen[2])
 
-def expand(i: int, coord: float) -> int:
-    '''Rounds W, S coordinates down, and
-    E, N coordinates up to the nearest integer.'''
+def __expand(i: int, coord: float) -> int:
+    '''
+    Makes boundary boxes larger by slightly shifting
+    E, N coordinates to right and 
+    S, W coordinates to left toward 
+    nearest integer values.
+    
+    Valid inputs are:
+        0: W (make smaller)
+        1: S (make smaller)
+        2: E (make larger)
+        3: N (make larger)    
+    '''	
     return math.floor(coord) if i < 2 else math.ceil(coord)

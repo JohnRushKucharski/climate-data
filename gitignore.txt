@@ -218,3 +218,6 @@ Backup[ ]of[ ]*.numbers/
 
 # Built Visual Studio Code Extensions
 *.vsix
+
+# API Tokens
+tokens.toml
