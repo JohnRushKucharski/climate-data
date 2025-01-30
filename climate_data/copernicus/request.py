@@ -140,7 +140,7 @@ class CMIP6Request:
             self.status = Status.SUCCESS
             #self.unzip_file(self.file_chain[-1], Path(file_name).stem, file_format, overwrite)
             #return str(self.file_chain[-1])
-        except Exception as e:
+        except Exception as e: # pylint: disable=broad-except
             self.status = Status.ERROR
             return f'Error: {e}'
         self.unzip_file(self.file_chain[-1], Path(file_name).stem, file_format, overwrite)
@@ -186,7 +186,7 @@ class CMIP6Request:
             self.file_chain.append(new_name)
         return new_name
 
-def build_CMIP6Requests(location: tuple[int, int, int, int],
+def build_CMIP6Requests(location: tuple[int, int, int, int], # pylint: disable=invalid-name
                         variables: list[cmip6.Variables],
                         timesteps: list[cmip6.TemporalResolutions],
                         models: list[cmip6.Models],
@@ -198,7 +198,8 @@ def build_CMIP6Requests(location: tuple[int, int, int, int],
     
     Note:
         [1] If years are not provided, they are inferred for each experiment.
-        [2] Month and day (when applicable) request parameters are set to defaults, i.e., all months and days.
+        [2] Month and day (when applicable) request parameters are set to defaults,
+            i.e., all months and days.
         [3] There are many possible error states, most are not checked until the request is made.
     '''
     if len(variables) != len(timesteps):
@@ -230,7 +231,7 @@ def download_requests(requests: list[CMIP6Request],
         if r.status == Status.SUCCESS:
             success_count += 1
     print(f'Successfully processed {success_count} of {len(requests)} requests.')
-    
+
 @dataclass
 class CMIP6Experiment:
     '''
