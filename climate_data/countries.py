@@ -186,7 +186,7 @@ COUNTRIES = {v[0]: v[1] for _, v in country_bounding_boxes.items()}
 # with W < E and S < N
 def get_country_bounding_box(country: str) -> tuple[int, int, int, int]:
     '''
-    Returns N, W, S E boundary box coordinates for country.
+    Returns N, W, S, E boundary box coordinates for country.
     
     Recieves W, S, E, N integer boundary coordinates of country,
     slightly expands boundary box by rounding coordinates to integer values.
