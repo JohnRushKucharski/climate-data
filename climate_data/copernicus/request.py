@@ -17,22 +17,6 @@ class Status(Enum):
     SUCCESS = 'success'
     UNPROCESSED = 'unprocessed'
 
-# @dataclass
-# class CMIP6ModelVariable:
-#     '''
-#     CMIP6 space-time variable.
-#     '''
-#     variable: CMIP6Variables = CMIP6Variables.TEMP
-#     area: tuple[int, int, int, int] = (1, 0, 0, 1) # [N, W, S, E]
-#     temporal_resolution: CMIP6Resolutions = CMIP6Resolutions.MONTHLY
-#     years: tuple[str, ...] = HISTORY_YEARS
-#     months: tuple[str, ...] = MONTHS
-#     days: None|tuple[str, ...]=None
-
-#     def __post_init__(self):
-#         if self.temporal_resolution == CMIP6Resolutions.DAILY and self.days is None:
-#             raise ValueError('Error: days must be set for daily requests.')
-
 @dataclass
 class CMIP6Request:
     '''
@@ -136,11 +120,14 @@ class CMIP6Request:
         filepath = Path(directory) / file_name
         if filepath.exists():
             if not overwrite:
+                self.status = Status.ERROR
                 raise FileExistsError(
                     f'''File at: {str(filepath)} already exists,
                     choose overwrite=True to replace existing file.''')
+            filepath.unlink() # remove existing file.
         else:
             if not filepath.parent.exists():
+                self.status = Status.ERROR
                 raise FileNotFoundError(
                     f'Directory at: {str(filepath.parent)} not found.')
 
@@ -151,22 +138,25 @@ class CMIP6Request:
             client.retrieve(cmip6.DATASET, self.request, filepath)
             self.file_chain.append(filepath)
             self.status = Status.SUCCESS
-            self.unzip_file(self.file_chain[-1], Path(file_name).stem, file_format)
-            return self.file_chain[-1]
+            #self.unzip_file(self.file_chain[-1], Path(file_name).stem, file_format, overwrite)
+            #return str(self.file_chain[-1])
         except Exception as e:
             self.status = Status.ERROR
             return f'Error: {e}'
+        self.unzip_file(self.file_chain[-1], Path(file_name).stem, file_format, overwrite)
+        return str(self.file_chain[-1])
 
     def unzip_file(self, zippath: str, file_name: str = '',
-                   file_format: str = cmip6.FileFormats.NETCDF.value) -> str:
+                   file_format: str = cmip6.FileFormats.NETCDF.value,
+                   overwrite: bool = False) -> str:
         '''Unzips a single file with a specified extension.'''          
         #check zip file path.
         if not Path(zippath).exists():
+            self.status = Status.ERROR
             raise FileNotFoundError(f'Error: {zippath} not found.')
-        else:
-            if self.status != Status.SUCCESS:
-                print(f'''Warning: unzip proceeding at {zippath},
-                      but request status is {self.status}.''')
+        if self.status != Status.SUCCESS:
+            print(f'''Warning: unzip proceeding at {zippath},
+                  but request status is {self.status}.''')
 
         # Validate and set file name.
         file_name = self.create_or_name_file(file_name, file_format)
@@ -184,11 +174,63 @@ class CMIP6Request:
                 raise FileNotFoundError(
                     f'''Expected one {file_format} file,
                     found {len(files)} in {zippath}.''')
+            if new_name.exists():
+                if not overwrite:
+                    self.status = Status.ERROR
+                    raise FileExistsError(
+                        f'''File at: {str(new_name)} already exists,
+                        choose overwrite=True to replace.''')
+                new_name.unlink()
             zip_ref.extract(files[0], Path(zippath).parent)
             (Path(zippath).parent / Path(files[0]).name).rename(new_name)
             self.file_chain.append(new_name)
         return new_name
 
+def build_CMIP6Requests(location: tuple[int, int, int, int],
+                        variables: list[cmip6.Variables],
+                        timesteps: list[cmip6.TemporalResolutions],
+                        models: list[cmip6.Models],
+                        experiments: list[cmip6.Experiments],
+                        years: None|tuple[str,...] = None,
+                        ) -> list[CMIP6Request]:
+    '''
+    Builds a list of CMIP6 requests for a single location.
+    
+    Note:
+        [1] If years are not provided, they are inferred for each experiment.
+        [2] Month and day (when applicable) request parameters are set to defaults, i.e., all months and days.
+        [3] There are many possible error states, most are not checked until the request is made.
+    '''
+    if len(variables) != len(timesteps):
+        raise ValueError('Variables and timesteps must have the same length.')
+    requests = []
+    for i, var in enumerate(variables):
+        ts = timesteps[i]
+        for model in models:
+            for ssp in experiments:
+                requests.append(CMIP6Request(model, ssp, years, location, var, ts))
+    return requests
+
+def download_requests(requests: list[CMIP6Request],
+                      base_directory: str, overwrite: bool = False,
+                      file_format: str = cmip6.FileFormats.NETCDF.value) -> list[str]:
+    '''
+    Bath process a list of CMIP6 requests.
+    
+    Note:
+        [1] Downloaded files are given default names.
+        [2] Default directory structure is created (in base directory).
+    '''
+    success_count = 0
+    print(f'Downloading {len(requests)} requests to: {base_directory}')
+    for i, r in enumerate(requests):
+        r.download(r.create_directories(base_directory),
+                   overwrite=overwrite, file_format=file_format)
+        print(f'''    {[i]} {r.status}: {r.file_chain[-1].name}''')
+        if r.status == Status.SUCCESS:
+            success_count += 1
+    print(f'Successfully processed {success_count} of {len(requests)} requests.')
+    
 @dataclass
 class CMIP6Experiment:
     '''
