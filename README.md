@@ -32,7 +32,7 @@ This creates a python virtual environment containing climate-data dependencies, 
 ## Basic Usage
 climate-data is intended use is as a library within a python script (or jupyter notebook). 
 
-The following code builds a request (i.e. *small_request*) for 2 years of simulated monthly near-surface air temperture data from a single CMIP6 experiment-model pair in a box around 1N, 1W, 0S, 1E degrees latitude and longitude and downloads it from the CDS API.
+The following code builds a *CMIP6Request* named *small_request*. This request is used to download (using the *CMIP6Request.download* function) 2 years of monthly near-surface air temperture data from a CMIP6 experiment-model pair (i.e. historical- ACCESS_CM2) within a bounding box around 1N, 1W, 0S, 1E degrees latitude and longitude from the CDS API.
 
 ```python
 import climate_data.copernicus.cmip6 as cmip6
@@ -54,14 +54,27 @@ small_request.download(
 )
 ```
 
-The *climate-data.copernicus.cmip6* module provides constants of acceptible values for the many of the request parameters.
+The *climate-data.copernicus.cmip6* module provides acceptable values for the most of the possible CDS API request parameters (i.e. experiment, model, variable names, etc.).
 
-In the codeblock below the *get_country_boundary_box* function from the *climate_data.countries* module is used to get a bounding box of latitude and longitude coordinates for the country of Laos. This bounding box is used to modify the *small_request* from the previous example, using the *build_CMIP6Requests* function in the codeblock below.
+The *climate_data.countries* module includes boundary boxes for nearly every country on the planet. The *get_country_boundary_box* function is used to get a bounding box of latitude and longitude coordinates. A cartoon representation of the bounding box coordinates for the country of Laos is displayed below. The *get_country_boundary_box* function in the program returns this boundary box as N, W, S, E latitue longitude tuple: i.e., (23, 100, 13, 108).
 
-The *build_CMIP6Requests* and *download_requests* functions used the codeblock below are used to expand *small_request* in the previous example to a second general circulation model (GCM). This function can also be use to request additional data variables, experiments, etc.
+```
+ ,--23--,
+ | L    |
+ |  A  108
+100  O  |
+ |    S |
+ '--13--'
+```
+
+The *build_CMIP6Requests* function, in the *climate-data.copernicus.cmip6* module returns a list of *CMIP6Requests*. It is used to request multiple of data variables, models, experiments, etc.
+
+In the codeblock below the *build_CMIP6Requests* and *download_requests* functions expands the *small_request* created in the previous example to include a second general circulation model (GCM). Meanwhile the *get_country_boundary_box* changes modifies the location of the request. 
 
 ```python
 from climate_data.countries import get_country_bounding_box
+
+LAOS_BBOX = get_country_bounding_box("Laos") # returns (23, 100, 13, 108)
 
 laos2model_requests = cds.build_CMIP6Requests(
     location=LAOS_BBOX,
@@ -73,9 +86,36 @@ laos2model_requests = cds.build_CMIP6Requests(
 )
 
 cds.download_requests(
-    small_requests2, basedir
+    requests = small_requests2,
+    base_directory = basedir
 )
 ```
+
+The data cooresponding to each *CMIP6Request* is downloaded as a seperate .zip file. From the *base_directory* parameter in the *download_requests* function the generic file heirarchy displayed below built for the list of requests (provided that it does not already exist). In this diagram <variable_*> refers to the name of a requested variable, <timestep_*> refers to the requested temporal resolution (i.e. monthly, daily). The downloaded .zip files for each request is stored in the appropriate .zip folder. 
+
+```
+base_directory
+|
++--cmip6
+|  |
+|  +--<variable_1>
+|  |   |
+|  |   +--<timestep_1>
+|  |   |   *<model>_<exp>_<end_date>-<start_date>.nc
+|  |   |   * ...
+|  |   |   \ zip
+|  |   +--<timestep_2>
+|  |   |   * ...
+|  |   |   \ zip
+|  |   +-- ...
+|  +--<variable_2>
+|  |    ...
+|  +-- ...
+|  |
+|  \__<variable_n>
+```
+As part of the downloading routine the compressed netCDF files contained in each of the downloaded .zip files are extracted to the parent directory. These extracted files following the <model>_<exp>_<end_date>-<start_date>.nc file naming convention shown in the diagram above. In this convension <model> and <exp> refer to the names of the requested model and CMIP6 experiment (i.e. historical, ssp585, etc.) respectively. The <end_date>-<start_date> parts refer to the latest and earliest years, months (and for daily request days) in the request, recorded in YYYYMMDD format.
+
 
 ## Planned Development
 Future versions will expand the climate-data programs functionality to other datasets (i.e. ERA5 reanalysis data) and APIs.
